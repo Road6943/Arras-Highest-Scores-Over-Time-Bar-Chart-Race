@@ -24,8 +24,6 @@ Instructions:
 
 * Change the variables below
 * Run this script with `python3 make_racing_bar_chart.py`
-* If you want the script to run faster, set GENERATE_FLOURISH_CSV to False, which will run the whole script but not write the output to a csv file
-* This makes it significantly faster, so only set GENERATE_FLOURISH_CSV to True after you are done hardcoding the scores from imgur and other sites that the script couldn't date on its own
 
 * Check generated_files/missing-scores.txt for any missing scores that the script couldn't give a date to
 * If not already set to True, set RUN_WEB_SCRAPER_FOR_MISSING_DATES to True, and rerun make_racing_bar_chart.py
@@ -36,9 +34,8 @@ Instructions:
 
 * Use further manual methods to hardcode dates for the remaining missing scores (opening the links yourself, search discord, dm players, ...)
 
-* Make sure GENERATE_FLOURISH_CSV is set to True now, and rerun the script
-* Get the flourish csv file from the generated_files directory
-* Go to https://flourish.studio/ and create a Bar Chart Race with that csv file
+* Get the flourish csv files from the generated_files directory
+* Go to https://flourish.studio/ and create a Bar Chart Race with those csv files (Data for Data, Captions for Captions)
 * Much of the chart customization occurs in the flourish settings, and I have recorded several of the settings I used for the final version of this visualization below
 * To figure out which gamemodes to assign custom colors to in Flourish (aka the gamemodes that will actually appear in the visualization),
     make a list, and type/write new items into that list when you see them. Then set that item's custom color to black/some low visibility color
@@ -56,7 +53,9 @@ Data:
 
     Captions:
         Image: (None)
-        From | To | Caption:
+        From :: To :: Caption:
+        <generated programatically by this script>
+        <see FLOURISH_CAPTIONS_CSV_NAME>
 
 Preview:
     Bars:
@@ -95,28 +94,30 @@ Legacy Squads-Duos: #6c71c4cc
         Current time counter - size(% of screen): 6
         Total: turn off
     Captions:
-        Background:
-        Border:
-        Opacity:
-        Padding:
+        Background: #073642
+        Border: #b58900
+        Opacity: 0.5
+        Padding: 0.5
         Align: Center
         Position: Center Right
-        Font Size:
-        Text Color:
+        Font Size: 1.1
+        Text Color: #b58900
         Content Mode: HTML
     Controls:
         Show Sort Control: turn off
     Legend:
         Disabled
     Axis:
-        Line Color: #657b83
+        Line Color: #002b36
+        Line Dash: 0.5
     Timeline & Animation:
         Graph:
             Visibility: Hide (Yes, Hide; I turned the graph off once legacy was added because it became too laggy)
             Height: 7
             Background: #073642
         Axes Color: #fdf6e3
-        Timeline Duration: 90
+        Timeline Duration: 125
+        Duration Before Loop: 10 # so I can scroll down in the video
         Time Jump Duration: 1
         Bar Rank Animation Duration: 1.25
         Playback Button:
@@ -146,13 +147,16 @@ SUBMISSIONS_CSV_NAME = "Arras.io World Records - Submissions.csv"
 OLDER_SUBMISSIONS_CSV_NAME = "Older Arras WR Submissions - OlderSubmissions.csv"
 OLDEST_SUBMISSIONS_CSV_NAME = "The Oldest Arras WR Submissions - OldSubmissions.csv"
 
-# The csv that will be outputted to and can be inputted into Flourish Studio to generate the Racing Bar Chart
-FLOURISH_OUTPUT_CSV_NAME = "Flourish_Racing_Bar_Chart_Data.csv"
+# The csv's that will be outputted to and can be inputted into Flourish Studio to generate the Racing Bar Chart
 GENERATED_FILES_FOLDER_NAME = "generated_files"
-# Set this to true when you want an output csv to be generated
-# Most of the script is pretty quick, but writing to an output csv takes a while, so only set this to True
-#   once you've finished gathering dates for all the scores via the imgur scraper and manual hardcoding
-GENERATE_FLOURISH_CSV = False
+FLOURISH_DATA_CSV_NAME = "Flourish_Racing_Bar_Chart_Data.csv"
+FLOURISH_CAPTIONS_CSV_NAME = "Flourish_Racing_Bar_Chart_Captions.csv"
+
+FLOURISH_CAPTIONS_COLORS = {
+    'HEADER': '#b58900',
+    'TOP_SCORE': '#b58900',
+    'OTHER_SCORES': '#586e75', 
+}
 
 # if set to true, the rowsWithoutDates will be scraped and their dates printed to the terminal in a format that can directly be copied into HARDCODED_DATES
 RUN_WEB_SCRAPER_FOR_MISSING_DATES = True
@@ -233,7 +237,9 @@ HARDCODED_DATES = {
 
 
 import csv
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
+from collections import defaultdict, Counter, OrderedDict
+from copy import deepcopy
 
 import time
 import asyncio
@@ -346,6 +352,13 @@ def getField(row, field, sheet="submissions"):
 
 def parseDate(dateStr):
     return time.strptime(dateStr, "%m/%d/%Y")
+
+
+def formatDate(dateStr):
+    '''
+        turn a string like 11/15/2018 into 11/15/18
+    '''
+    return datetime.strptime(dateStr, "%m/%d/%Y").strftime("%-m/%-d/%y")
 
 
 def makeDateLookup():
@@ -472,13 +485,15 @@ def findTimestampsOfScoresOnHasAndLas(dateLookup, hardcodedLookup):
 
             # if a date is before HAS_START_DATE, then make it HAS_START_DATE to maintain consistency across all airtable scores
             # (since a score A might have occurred before a score B, but A can't be truly dated while B can, so just give both the HAS_START_DATE)
-            if parseDate(date) < parseDate(HAS_START_DATE):
+            parsedDate = parseDate(date)
+            if parsedDate < parseDate(HAS_START_DATE):
                 date = HAS_START_DATE
 
             scores.append({
                 "row": row,
                 "sheet": "has_calculations",
                 "date": date,
+                "parsedDate": parsedDate,
             })
 
     makeMissingScoresFile(rowsWithoutDates)
@@ -492,13 +507,61 @@ def findTimestampsOfScoresOnHasAndLas(dateLookup, hardcodedLookup):
     return scores
 
 
-def makeFlourishCsvFile(scoresWithDates):
+def makeDaysAtTopCounter(dates, parsedDates, formattedDates, scoresWithDates):
+    # make a data structure to track the maxScore and maxScoreObj for each date
+    datesAndTheirMaxScore = OrderedDict()
+
+    for i,dateStr in enumerate(dates):
+        parsedDate = parsedDates[i]
+        formattedDateStr = formattedDates[i]
+
+        datesAndTheirMaxScore[formattedDateStr] = {
+            'maxScore': -1,
+            'maxScoreObj': {},
+        }
+
+        for score in scoresWithDates:
+            # if the score did not happen yet, ignore it
+            if parsedDate < score['parsedDate']:
+                continue
+
+            # make helper function to get field with less typing
+            gF = lambda fieldName: getField(score['row'], fieldName, sheet=score['sheet'])
+            
+            scoreNumber = gF('score')
+
+            # find max score for each date
+            if scoreNumber > datesAndTheirMaxScore[formattedDateStr]['maxScore']:
+                datesAndTheirMaxScore[formattedDateStr]['maxScore'] = scoreNumber
+                datesAndTheirMaxScore[formattedDateStr]['maxScoreObj'] = score
+
+    daysAtTopCounter = []
+    for i,formattedDateStr in enumerate(datesAndTheirMaxScore):
+        wrapperObj = datesAndTheirMaxScore[formattedDateStr]
+        currentScore = datesAndTheirMaxScore[formattedDateStr]['maxScore']
+        currentScoreObj = datesAndTheirMaxScore[formattedDateStr]['maxScoreObj']
+
+        # new max score, so create a daysAtTop field = 1, and append to array
+        # also covers first item, when theres no -1 index as the list is empty
+        if i == 0 or daysAtTopCounter[-1]['maxScore'] != currentScore:
+            wrapperObj['daysAtTop'] = 1
+            daysAtTopCounter.append(wrapperObj)
+        # date has same max score as previous date, aka same score obj
+        # so increment counter
+        else:
+            daysAtTopCounter[-1]['daysAtTop'] += 1
+
+    return daysAtTopCounter
+
+
+def makeFlourishCsvFiles(scoresWithDates):
     """
         convert all the scores and their dates into a csv file that can be uploaded to flourish.studio to generate a bar chart race
 
         scoresWithDates is a list of score structs
 
-        the generated flourish csv file will be in the generated_files folder
+        the generated flourish data csv file will be in the generated_files folder
+        this function will also call another function that creates the flourish captions csv file
     """
 
     # if given a date like "1/31/2020", returns "2/1/2020"
@@ -519,16 +582,18 @@ def makeFlourishCsvFile(scoresWithDates):
         dates.append(d)
         d = get_next_date(d)
 
+    # pre-parse all dates so they don't have to be re-parsed every loop
+    parsedDates = [parseDate(date) for date in dates]
+
     # convert dates from 1/2/2021 format to 1/2/21 format (short years)
     # so that I can make their font size bigger in Flourish
     formatted_dates = [
-        datetime.strptime(dateStr, "%m/%d/%Y").strftime("%-m/%-d/%y")
+        formatDate(dateStr)
         for dateStr in dates
     ]
 
-
-    with open(GENERATED_FILES_FOLDER_NAME + "/" + FLOURISH_OUTPUT_CSV_NAME, "w") as flourishCsvFile:
-        writer = csv.writer(flourishCsvFile)
+    with open(GENERATED_FILES_FOLDER_NAME + "/" + FLOURISH_DATA_CSV_NAME, "w") as flourishDataFile:
+        writer = csv.writer(flourishDataFile)
 
         # header row
         writer.writerow(["Description", "Description & Legacy Status", "Gamemode",  "Gamemode & Legacy Status", *formatted_dates])
@@ -548,9 +613,11 @@ def makeFlourishCsvFile(scoresWithDates):
 
             new_csv_row = [description, descriptionAndLegacyStatus, gamemode, gamemodeAndLegacyStatus]
 
-            for day in dates:
+            parsedScoreDate = score['parsedDate']
+
+            for day in parsedDates:
                 # if score hasn't happened yet as of current day, then set it to 0
-                if parseDate(day) < parseDate(score['date']):
+                if day < parsedScoreDate:
                     new_csv_row.append(0)
                 # if current day is on or after when the score was gotten, append the score's numerical score value
                 else:
@@ -558,14 +625,83 @@ def makeFlourishCsvFile(scoresWithDates):
 
             writer.writerow(new_csv_row)
 
+    # make a 2nd csv to use in the captions part of flourish to create a counter for # of days at 1st
+    daysAtTopCounter = makeDaysAtTopCounter(dates, parsedDates, formatted_dates, scoresWithDates)
+
+    # print top scorers and how long they held the top spot
+    # for x in daysAtTopCounter:
+    #     row = x['maxScoreObj']['row']
+    #     _ = lambda fieldName: getField(row, fieldName, sheet=x['maxScoreObj']['sheet'])
+    #     print(x['maxScore'], _('tank'), _('gamemode'), 'by', _('name'), ' -> ', x['daysAtTop'], 'days at top')
+
+    with open(GENERATED_FILES_FOLDER_NAME + "/" + FLOURISH_CAPTIONS_CSV_NAME, 'w') as flourishCaptionsFile:
+        writer = csv.writer(flourishCaptionsFile)
+
+        # header row
+        writer.writerow(['From', 'To', 'Caption'])
+
+
+        topScoreObjs = [wrapperObj['maxScoreObj'] for wrapperObj in deepcopy(daysAtTopCounter)]
+        currentTopScoreObj = topScoreObjs[0]
+        del topScoreObjs[0]
+
+        # captionRows is a list where each item is a dict holding keys playerName 
+        # and daysAtTop representing a top or former top score
+        captionRows = [{
+            'playerName': getField(currentTopScoreObj['row'], 'name', sheet=currentTopScoreObj['sheet']),
+            'daysAtTop': 0
+        }]
+
+        # iterate over every date
+        for i,parsedDay in enumerate(parsedDates):
+
+            # add the from and to dates
+            # the last day doesn't have anything after it, so use it for both from and to
+            rowToWrite = []
+            if i == len(parsedDates) - 1:
+                rowToWrite += [ formatted_dates[i], formatted_dates[i] ]
+            else:
+                rowToWrite += [ formatted_dates[i], formatted_dates[i+1] ]
+
+            # if the date is before the first item in topScoreObj's, 
+            # then increment the counter for the currentTopScoreObj in captionRows
+            # also applies when you've reached the final topScoreObj
+            if len(topScoreObjs) == 0 or parsedDay < topScoreObjs[0]['parsedDate']:
+                captionRows[0]['daysAtTop'] += 1
+                
+
+            # else if the date is equal to the first item in topScoreObj's, 
+            # then append a new captionRow with count 1 at start of captionRows
+            # and set the currentScoreObj to the first item in topScoreObj's 
+            # and then delete that first item from topScoreObjs
+            else:
+                currentTopScoreObj = topScoreObjs[0]
+                del topScoreObjs[0]
+
+                captionRows = [
+                    {
+                        'playerName': getField(currentTopScoreObj['row'], 'name', sheet=currentTopScoreObj['sheet']),
+                        'daysAtTop': 1
+                    }, 
+                    *captionRows
+                ]
+
+            caption = f'''<span style="color: {FLOURISH_CAPTIONS_COLORS['HEADER']}" ><b>Days At Top:</b></span><br>'''
+            for i,row in enumerate(captionRows):
+                rowColor = FLOURISH_CAPTIONS_COLORS['TOP_SCORE'] if i == 0 else FLOURISH_CAPTIONS_COLORS['OTHER_SCORES']
+                caption += f'''<span style="color: {rowColor}">{row["playerName"]}: {row["daysAtTop"]}</span><br>'''
+            
+            rowToWrite.append(caption)
+            writer.writerow(rowToWrite)
+                
+            
+
+
     
 def main():
     dateLookup = makeDateLookup()
     scoresWithDates = findTimestampsOfScoresOnHasAndLas(dateLookup, HARDCODED_DATES)
-    # only generate output if the user sets this variable to True, as writing csv output takes a while and should only be done
-    # at the very end once all scores' dates are found and accounted for
-    if GENERATE_FLOURISH_CSV:
-        makeFlourishCsvFile(scoresWithDates)
+    makeFlourishCsvFiles(scoresWithDates)
 
 
 if __name__ == "__main__":

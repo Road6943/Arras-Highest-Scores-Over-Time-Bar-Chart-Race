@@ -3,6 +3,11 @@ In the Hall of the Mountain King, the part from 40-ish to 2:15-ish is perfect, a
     - https://www.youtube.com/watch?v=tpcee4-g0Nw&list=PLgg6LswqK80ZOtKndAbJmk6Azi3gzJRjR&index=11
     - though I'm not doing the long intro anymore so maybe a different music is needed now
 
+New longer & slower music:
+https://www.youtube.com/watch?v=t9glFROS8-k&list=PLzCxunOM5WFKIFKApBxd7Qbl2MVhM7t0O&index=2
+Twenties – Peyruis (No Copyright Music)
+
+
 How disclaimers will be shown:
 ```
 1) Show semi-customized submission form. Zoom in so recorded screen matches flourish, and then Type(or just show pre-typed stuff in long answer box if typing is too long/loud):
@@ -12,7 +17,7 @@ extraDetails: The video starts from 11/15/18 since that's when Highest Arras Sco
 
 STOP STOP STOP
 Some of these can be captions inside flourish
-- video starts from 11/15/18
+- video starts from 11/15/18 DONE
 - [LEGACY] explanation
 
 {{PASTE the following into Proof}}::{{
@@ -29,6 +34,7 @@ Highest Arras Scores
     [x] sjoshi
     [x] skrialik (bastard)
     [x] Crazy Carrot
+    [x] ZeZo
 }}
 {{Hit Submit, and redirect to custom submit message ("Without further ado, Let's Begin!), and maybe throw a link to the flourish visualization in there to click and start}}
 
