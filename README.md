@@ -3,9 +3,10 @@
 This repo contains a python script (make_racing_bar_chart.py) that can generate a csv file which can be uploaded to flourish.studio in order to generate an interactive bar chart race for the highest arras scores over time. 
 
 [Link to interactive graphic](https://public.flourish.studio/visualisation/8189030/)
-[Link to YouTube video](https://www.youtube.com/watch?v=tASo4myW0qY)
 
+[Click me or the image below for the YouTube video!](https://www.youtube.com/watch?v=tASo4myW0qY)
 
+[![Youtube Link](https://user-images.githubusercontent.com/33289997/147847947-ecd4202f-61c7-48c1-a4bd-bd001c38c4bf.jpg)](https://www.youtube.com/watch?v=tASo4myW0qY)
 
 Instructions for using the script are located within it as a giant comment. The process is somewhat complicated and involves downloading multiple google sheets as csv files, changing numerous configuration variables, multiple runs and edits and reruns of the make_racing_bar_chart.py script, and much more, so read the instructions carefully. 
 
