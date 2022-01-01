@@ -35,6 +35,10 @@ Description:
 
 ~~~~~
 
+This video shows the highest arras.io scores over time.
+
+=====
+
 Darker/More-Transparent bars marked with `[LEGACY]` are "Legacy Arras Scores", which were done with a tank that has been significantly nerfed since that score. These scores appear in the Legacy Arras Scores sheet, not the Highest Arras Scores sheet.
 
 The graphic starts from November 15, 2018 because that is the date when "Highest Arras Scores" was added to the Arras World Records Spreadsheet.
@@ -42,6 +46,9 @@ The graphic starts from November 15, 2018 because that is the date when "Highest
 This project took about 1 week to finish. I made a python script to track down timestamps for every score on Highest and Legacy Arras Scores and used flourish.studio to generate the visualization. You can check out the interactive Flourish graphic at this link:
 
 https://public.flourish.studio/visualisation/8189030/
+
+Code: 
+https://github.com/Road6943/Arras-Highest-Scores-Over-Time-Bar-Chart-Race
 
 =====
 
